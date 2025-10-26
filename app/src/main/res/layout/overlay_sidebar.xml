@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/sidebarRoot"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/sidebar_bg"
+    android:padding="6dp">
+
+    <ImageButton
+        android:id="@+id/btnSettings"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_settings_small"
+        android:contentDescription="Settings"
+        android:layout_gravity="end" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/sidebarRecycler"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:overScrollMode="never"
+        android:layout_marginTop="4dp" />
+</LinearLayout>

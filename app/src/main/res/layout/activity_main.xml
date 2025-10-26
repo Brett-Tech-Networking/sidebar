@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/drawerLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
+
+    <!-- Main content -->
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="?attr/colorPrimary"
+            android:theme="@style/ThemeOverlay.Material3.ActionBar"
+            app:title="Sidebar" />
+
+        <!-- A slim handle to indicate the drawer; tap to open -->
+        <View
+            android:id="@+id/handle"
+            android:layout_width="12dp"
+            android:layout_height="80dp"
+            android:layout_gravity="start|center_vertical"
+            android:background="@drawable/handle_bg"
+            android:translationZ="8dp"
+            android:layout_marginStart="0dp"
+            android:layout_marginTop="120dp" />
+
+        <!-- Your main content could go here; keeping it simple -->
+        <TextView
+            android:id="@+id/tvInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="100dp"
+            android:layout_marginStart="24dp"
+            android:text="Swipe from the left edge (or tap the handle) to open the Sidebar.\nUse Settings to choose apps."
+            android:textSize="16sp" />
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+    <!-- Left Drawer: the Samsung-like panel -->
+    <LinearLayout
+        android:id="@+id/sidebar_container"
+        android:layout_width="220dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:background="@drawable/sidebar_bg"
+        android:orientation="vertical"
+        android:padding="8dp">
+
+        <TextView
+            android:id="@+id/sidebar_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:text="Quick Apps"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/sidebarRecycler"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:overScrollMode="never"
+            android:clipToPadding="false"
+            android:paddingBottom="16dp" />
+    </LinearLayout>
+
+</androidx.drawerlayout.widget.DrawerLayout>
