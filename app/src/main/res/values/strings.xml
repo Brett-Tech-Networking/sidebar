@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Sidebar</string>
+    <string name="settings" />
 </resources>
