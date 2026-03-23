@@ -6,79 +6,91 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.view.Menu
-import android.view.MenuItem
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.bretttech.sidebar.databinding.ActivityMainBinding
 import com.bretttech.sidebar.service.OverlayService
-import com.bretttech.sidebar.ui.settings.SettingsActivity
+import com.bretttech.sidebar.ui.theme.settings.SettingsActivity
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
 
-    private val requestPostNotifications = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { /* result: granted/denied — we proceed regardless, FGS will still show a silent notif if denied */ }
+    private val requestPostNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        setSupportActionBar(binding.toolbar)
 
-        // Ask for overlay permission if needed
-        ensureOverlayPermission()
+        val baseLeft = binding.root.paddingLeft
+        val baseTop = binding.root.paddingTop
+        val baseRight = binding.root.paddingRight
+        val baseBottom = binding.root.paddingBottom
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(
+                baseLeft + bars.left,
+                baseTop + bars.top,
+                baseRight + bars.right,
+                baseBottom + bars.bottom
+            )
+            insets
+        }
+        ViewCompat.requestApplyInsets(binding.root)
 
-        // Ask for notifications permission on Android 13+
+        binding.btnGrantOverlay.setOnClickListener {
+            openOverlayPermissionScreen()
+        }
+
+        binding.btnOpenSettings.setOnClickListener {
+            startActivity(SettingsActivity.intent(this))
+        }
+
+        binding.btnStartSidebar.setOnClickListener {
+            if (!Settings.canDrawOverlays(this)) {
+                Toast.makeText(this, R.string.overlay_required, Toast.LENGTH_SHORT).show()
+                openOverlayPermissionScreen()
+                return@setOnClickListener
+            }
+            OverlayService.start(this, OverlayService.ACTION_RELOAD)
+        }
+
         if (Build.VERSION.SDK_INT >= 33) {
             requestPostNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        // Start/ensure the overlay service is running
-        startOverlayService()
+        updateUiState()
     }
 
     override fun onResume() {
         super.onResume()
-        // In case the user just granted overlay permission in Settings
-        if (Settings.canDrawOverlays(this)) {
-            startOverlayService()
-        }
+        updateUiState()
     }
 
-    private fun startOverlayService() {
-        val intent = Intent(this, OverlayService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            ContextCompat.startForegroundService(this, intent)
+    private fun updateUiState() {
+        val hasOverlayPermission = Settings.canDrawOverlays(this)
+        binding.tvStatus.text = if (hasOverlayPermission) {
+            getString(R.string.status_overlay_granted)
         } else {
-            startService(intent)
+            getString(R.string.status_overlay_missing)
+        }
+        binding.btnStartSidebar.isEnabled = hasOverlayPermission
+
+        if (hasOverlayPermission) {
+            OverlayService.start(this, OverlayService.ACTION_START)
         }
     }
 
-    private fun ensureOverlayPermission() {
-        if (!Settings.canDrawOverlays(this)) {
-            // Send the user to the system overlay permission screen
-            val uri = Uri.parse("package:$packageName")
-            val permIntent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, uri)
-            startActivity(permIntent)
+    private fun openOverlayPermissionScreen() {
+        if (Settings.canDrawOverlays(this)) {
+            return
         }
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
-        menuInflater.inflate(R.menu.menu_main, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_settings -> {
-                startActivity(SettingsActivity.intent(this))
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
-        }
+        val uri = Uri.parse("package:$packageName")
+        val permIntent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, uri)
+        startActivity(permIntent)
     }
 }

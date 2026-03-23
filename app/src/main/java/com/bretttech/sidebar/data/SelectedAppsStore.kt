@@ -21,15 +21,35 @@ class SelectedAppsStore(context: Context) {
         prefs.edit().putString(KEY_PACKAGES, arr.toString()).apply()
     }
 
-    // LEFT / RIGHT side
-    fun getSidebarSide(): String = prefs.getString(KEY_SIDE, "left") ?: "left"
+    fun getSidebarSide(): String = prefs.getString(KEY_SIDE, "right") ?: "right"
 
     fun setSidebarSide(side: String) {
         prefs.edit().putString(KEY_SIDE, side).apply()
     }
 
+    fun isSidebarEnabled(): Boolean = prefs.getBoolean(KEY_ENABLED, true)
+
+    fun setSidebarEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_ENABLED, enabled).apply()
+    }
+
+    fun getSidebarYOffset(): Int = prefs.getInt(KEY_Y_OFFSET, 0)
+
+    fun setSidebarYOffset(yOffset: Int) {
+        prefs.edit().putInt(KEY_Y_OFFSET, yOffset).apply()
+    }
+
+    fun getPanelTheme(): String = prefs.getString(KEY_PANEL_THEME, "dark") ?: "dark"
+
+    fun setPanelTheme(theme: String) {
+        prefs.edit().putString(KEY_PANEL_THEME, theme).apply()
+    }
+
     companion object {
         private const val KEY_PACKAGES = "selected_packages"
         private const val KEY_SIDE = "sidebar_side"
+        private const val KEY_ENABLED = "sidebar_enabled"
+        private const val KEY_Y_OFFSET = "sidebar_y_offset"
+        private const val KEY_PANEL_THEME = "panel_theme"
     }
 }

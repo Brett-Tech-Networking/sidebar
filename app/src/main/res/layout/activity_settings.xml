@@ -6,10 +6,86 @@
     android:orientation="vertical"
     android:padding="12dp">
 
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchEnable"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/enable_sidebar"
+        android:checked="true" />
+
+    <RadioGroup
+        android:id="@+id/radioSideGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal">
+
+        <RadioButton
+            android:id="@+id/radioSideLeft"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="24dp"
+            android:text="@string/side_left" />
+
+        <RadioButton
+            android:id="@+id/radioSideRight"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/side_right" />
+    </RadioGroup>
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Choose apps to show in the Sidebar (max 2 columns, grows vertically)."
+        android:layout_marginTop="8dp"
+        android:text="@string/panel_style"
+        android:textStyle="bold" />
+
+    <RadioGroup
+        android:id="@+id/radioThemeGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <RadioButton
+            android:id="@+id/radioThemeDark"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="14dp"
+            android:text="@string/theme_dark" />
+
+        <RadioButton
+            android:id="@+id/radioThemeLight"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="14dp"
+            android:text="@string/theme_light" />
+
+        <RadioButton
+            android:id="@+id/radioThemeBlue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/theme_blue" />
+    </RadioGroup>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:hint="@string/search_apps">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/inputSearch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/settings_hint"
         android:textSize="14sp"
         android:paddingBottom="8dp" />
 
@@ -24,5 +100,5 @@
         android:id="@+id/btnSave"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Save" />
+        android:text="@string/save" />
 </LinearLayout>

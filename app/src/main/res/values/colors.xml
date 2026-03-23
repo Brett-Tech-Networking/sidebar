@@ -7,4 +7,11 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="edge_panel_bg">#FFF0F2F5</color>
+    <color name="edge_panel_stroke">#26000000</color>
+    <color name="edge_handle_bg">#DCE1E7</color>
+    <color name="edge_handle_stroke">#66000000</color>
+    <color name="edge_panel_item_bg">#FFFFFFFF</color>
+    <color name="edge_panel_label">#FF1D232B</color>
+    <color name="edge_panel_muted">#FF70757F</color>
 </resources>

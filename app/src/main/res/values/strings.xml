@@ -1,4 +1,31 @@
 <resources>
-    <string name="app_name">Sidebar</string>
-    <string name="settings" />
+    <string name="app_name">Edge Sidebar</string>
+    <string name="main_subtitle">Samsung-style quick app panel for Pixel. Keep it enabled and open it from the screen edge at any time.</string>
+    <string name="status_overlay_granted">Overlay permission granted. Sidebar can stay available on top of other apps.</string>
+    <string name="status_overlay_missing">Overlay permission is required before the edge panel can appear.</string>
+    <string name="overlay_required">Overlay permission is required.</string>
+    <string name="grant_overlay_permission">Grant Overlay Permission</string>
+    <string name="manage_shortcuts">Manage Shortcuts</string>
+    <string name="start_sidebar">Start / Refresh Sidebar</string>
+    <string name="sidebar_settings">Sidebar Settings</string>
+    <string name="open_sidebar">Open sidebar</string>
+    <string name="quick_apps">Quick Apps</string>
+    <string name="close_sidebar">Close sidebar</string>
+    <string name="panel_style">Panel style</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_blue">Blue</string>
+    <string name="edit_apps">Edit apps</string>
+    <string name="add_apps">Add apps</string>
+    <string name="remove_app">Remove app</string>
+    <string name="notification_channel_name">Edge Sidebar Service</string>
+    <string name="notification_title">Edge Sidebar is running</string>
+    <string name="notification_body">Tap the edge handle to open quick apps.</string>
+    <string name="settings_hint">Add or remove app shortcuts. Changes apply immediately after saving.</string>
+    <string name="save">Save</string>
+    <string name="search_apps">Search apps</string>
+    <string name="enable_sidebar">Enable always-on sidebar</string>
+    <string name="side_left">Left side</string>
+    <string name="side_right">Right side</string>
+    <string name="app_icon">App icon</string>
 </resources>

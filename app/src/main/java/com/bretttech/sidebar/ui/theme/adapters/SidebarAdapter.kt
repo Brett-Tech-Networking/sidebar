@@ -1,23 +1,64 @@
 package com.bretttech.sidebar.ui.adapters
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
-import androidx.recyclerview.widget.DiffUtil
-import androidx.recyclerview.widget.ListAdapter
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bretttech.sidebar.databinding.ItemAppBinding
 import com.bretttech.sidebar.model.AppEntry
+import java.util.Collections
 
 class SidebarAdapter(
-    private val onClick: (AppEntry) -> Unit
-) : ListAdapter<AppEntry, SidebarAdapter.VH>(Diff) {
+    private val onClick: (AppEntry) -> Unit,
+    private val onRemove: (AppEntry) -> Unit,
+    private val onOrderChanged: (List<String>) -> Unit
+) : RecyclerView.Adapter<SidebarAdapter.VH>() {
 
-    object Diff : DiffUtil.ItemCallback<AppEntry>() {
-        override fun areItemsTheSame(oldItem: AppEntry, newItem: AppEntry): Boolean =
-            oldItem.packageName == newItem.packageName
+    private val items = mutableListOf<AppEntry>()
 
-        override fun areContentsTheSame(oldItem: AppEntry, newItem: AppEntry): Boolean =
-            oldItem == newItem
+    private var editMode: Boolean = false
+    private var labelTextColorRes: Int = android.R.color.white
+
+    fun setEditMode(enabled: Boolean) {
+        if (editMode == enabled) return
+        editMode = enabled
+        notifyDataSetChanged()
+    }
+
+    fun isEditMode(): Boolean = editMode
+
+    fun setLabelTextColorRes(colorRes: Int) {
+        if (labelTextColorRes == colorRes) return
+        labelTextColorRes = colorRes
+        notifyDataSetChanged()
+    }
+
+    fun submitList(list: List<AppEntry>) {
+        items.clear()
+        items.addAll(list)
+        notifyDataSetChanged()
+    }
+
+    fun moveItem(fromPosition: Int, toPosition: Int) {
+        if (fromPosition !in items.indices || toPosition !in items.indices) return
+        if (fromPosition == toPosition) return
+
+        if (fromPosition < toPosition) {
+            for (index in fromPosition until toPosition) {
+                Collections.swap(items, index, index + 1)
+            }
+        } else {
+            for (index in fromPosition downTo toPosition + 1) {
+                Collections.swap(items, index, index - 1)
+            }
+        }
+        notifyItemMoved(fromPosition, toPosition)
+        persistOrder()
+    }
+
+    fun persistOrder() {
+        onOrderChanged(items.map { it.packageName })
     }
 
     class VH(val binding: ItemAppBinding) : RecyclerView.ViewHolder(binding.root)
@@ -29,9 +70,22 @@ class SidebarAdapter(
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
-        val item = getItem(position)
+        val item = items[position]
         holder.binding.appIcon.setImageDrawable(item.icon)
         holder.binding.appLabel.text = item.label
-        holder.binding.root.setOnClickListener { onClick(item) }
+        holder.binding.appLabel.setTextColor(
+            ContextCompat.getColor(holder.binding.root.context, labelTextColorRes)
+        )
+        holder.binding.btnRemove.visibility = if (editMode) View.VISIBLE else View.GONE
+        holder.binding.btnRemove.setOnClickListener { onRemove(item) }
+        holder.binding.root.setOnClickListener {
+            if (editMode) {
+                onRemove(item)
+            } else {
+                onClick(item)
+            }
+        }
     }
+
+    override fun getItemCount(): Int = items.size
 }
