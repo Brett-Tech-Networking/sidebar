@@ -42,6 +42,13 @@
         android:text="@string/manage_shortcuts" />
 
     <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnPreferences"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="@string/preferences" />
+
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/btnStartSidebar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

@@ -7,6 +7,9 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.graphics.Rect
 import android.graphics.PixelFormat
 import android.os.Build
@@ -22,6 +25,7 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.GridLayoutManager
@@ -33,6 +37,16 @@ import com.bretttech.sidebar.data.SelectedAppsStore
 import com.bretttech.sidebar.ui.adapters.SidebarAdapter
 import com.bretttech.sidebar.ui.theme.settings.SettingsActivity
 import com.bretttech.sidebar.util.AppsLoader
+import com.bretttech.sidebar.util.CrashRecovery
+import com.bretttech.sidebar.util.PanelStylePalette
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class OverlayService : Service() {
 
@@ -47,10 +61,14 @@ class OverlayService : Service() {
     private var sidebarAdapter: SidebarAdapter? = null
     private var sidebarLayoutManager: GridLayoutManager? = null
     private var panelContainerView: View? = null
+    private var edgeTouchZoneView: View? = null
+    private var edgeHandleView: View? = null
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var bindAppsJob: Job? = null
 
+    private val estimatedTileHeightDp = 88
     private val panelWidthSingleColumnDp = 132
     private val panelWidthTwoColumnDp = 220
-    private val estimatedTileHeightDp = 88
 
     private val dragHoldMillis = 350L
 
@@ -83,6 +101,7 @@ class OverlayService : Service() {
 
         when (action) {
             ACTION_RELOAD -> reloadOverlay()
+            ACTION_APPLY_PREFERENCES -> applyPreferencesToOverlay()
             ACTION_START -> if (sidebarView == null) createOverlay() else bindSidebarData()
         }
 
@@ -97,7 +116,10 @@ class OverlayService : Service() {
 
         val overlayRow = view.findViewById<LinearLayout>(R.id.overlayRow)
         val edgeTouchZone = view.findViewById<FrameLayout>(R.id.edgeTouchZone)
+        val edgeHandle = view.findViewById<View>(R.id.edgeHandle)
         val panelContainer = view.findViewById<View>(R.id.panelContainer)
+        edgeTouchZoneView = edgeTouchZone
+        edgeHandleView = edgeHandle
         panelContainerView = panelContainer
         val sidebarRecycler = view.findViewById<RecyclerView>(R.id.sidebarRecycler)
         val btnAddApps = view.findViewById<ImageButton>(R.id.btnAddApps)
@@ -105,6 +127,7 @@ class OverlayService : Service() {
 
         currentSide = store.getSidebarSide()
         overlayRow.layoutDirection = if (currentSide == "right") View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+        applyHandleSize()
         applyPanelTheme(panelContainer)
         panelContainer.visibility = View.GONE
         isPanelVisible = false
@@ -282,35 +305,92 @@ class OverlayService : Service() {
         val panelContainer = panelContainerView
         val recycler = container.findViewById<RecyclerView>(R.id.sidebarRecycler)
         val adapter = existingAdapter ?: recycler.adapter as? SidebarAdapter ?: return
-        selectedPackages.clear()
-        selectedPackages.addAll(store.getSelectedPackages())
-        val selectedSet = selectedPackages.toSet()
-        val ordered = AppsLoader.getLaunchableApps(this)
-            .filter { selectedSet.contains(it.packageName) }
-            .sortedBy { selectedPackages.indexOf(it.packageName) }
+        bindAppsJob?.cancel()
+        bindAppsJob = serviceScope.launch {
+            val selectedSnapshot = store.getSelectedPackages()
+            selectedPackages.clear()
+            selectedPackages.addAll(selectedSnapshot)
 
-        val estimatedTileHeightPx = dpToPx(estimatedTileHeightDp)
-        val recyclerHeightPx = if (recycler.height > 0) recycler.height else dpToPx(440)
-        val singleColumnCapacity = (recyclerHeightPx / estimatedTileHeightPx).coerceAtLeast(1)
-        val useTwoColumns = ordered.size > singleColumnCapacity
+            val selectedOrder = selectedSnapshot.withIndex().associate { it.value to it.index }
+            val ordered = withContext(Dispatchers.IO) {
+                AppsLoader.getLaunchableApps(this@OverlayService)
+                    .asSequence()
+                    .filter { selectedOrder.containsKey(it.packageName) }
+                    .sortedBy { selectedOrder[it.packageName] ?: Int.MAX_VALUE }
+                    .toList()
+            }
 
-        sidebarLayoutManager?.spanCount = if (useTwoColumns) 2 else 1
-        panelContainer?.layoutParams = panelContainer.layoutParams.apply {
-            width = dpToPx(if (useTwoColumns) panelWidthTwoColumnDp else panelWidthSingleColumnDp)
+            if (!isActive || sidebarView == null) return@launch
+
+            val estimatedTileHeightPx = dpToPx(estimatedTileHeightDp)
+            val recyclerHeightPx = if (recycler.height > 0) recycler.height else dpToPx(440)
+            val singleColumnCapacity = (recyclerHeightPx / estimatedTileHeightPx).coerceAtLeast(1)
+            val useTwoColumns = ordered.size > singleColumnCapacity
+
+            sidebarLayoutManager?.spanCount = if (useTwoColumns) 2 else 1
+            panelContainer?.layoutParams = panelContainer.layoutParams.apply {
+                width = dpToPx(if (useTwoColumns) panelWidthTwoColumnDp else panelWidthSingleColumnDp)
+            }
+            panelContainer?.requestLayout()
+
+            val labelColor = when (store.getPanelTheme()) {
+                "light" -> ContextCompat.getColor(this@OverlayService, R.color.edge_panel_label)
+                "custom" -> PanelStylePalette.forCustomBase(store.getCustomPanelColor()).labelColor
+                else -> android.graphics.Color.WHITE
+            }
+            adapter.setLabelTextColor(labelColor)
+            adapter.submitList(ordered)
         }
-        panelContainer?.requestLayout()
-
-        val labelColorRes = when (store.getPanelTheme()) {
-            "light" -> R.color.edge_panel_label
-            else -> android.R.color.white
-        }
-        adapter.setLabelTextColorRes(labelColorRes)
-        adapter.submitList(ordered)
     }
 
     private fun reloadOverlay() {
         removeOverlay()
         createOverlay()
+    }
+
+    private fun applyPreferencesToOverlay() {
+        if (sidebarView == null) {
+            createOverlay()
+            return
+        }
+
+        val root = sidebarView ?: return
+        val overlayRow = root.findViewById<LinearLayout>(R.id.overlayRow)
+        currentSide = store.getSidebarSide()
+        overlayRow.layoutDirection = if (currentSide == "right") View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+
+        layoutParams?.let { params ->
+            params.gravity = (if (currentSide == "right") Gravity.END else Gravity.START) or Gravity.CENTER_VERTICAL
+            params.y = store.getSidebarYOffset()
+            windowManager.updateViewLayout(root, params)
+        }
+
+        panelContainerView?.let { panel ->
+            applyPanelTheme(panel)
+            panel.requestLayout()
+        }
+
+        applyHandleSize()
+
+        bindSidebarData()
+    }
+
+    private fun applyHandleSize() {
+        val handleWidthPx = dpToPx(store.getHandleWidthDp())
+        val handleHeightPx = dpToPx(store.getHandleHeightDp())
+
+        edgeHandleView?.layoutParams = edgeHandleView?.layoutParams?.apply {
+            width = handleWidthPx
+            height = handleHeightPx
+        }
+        edgeTouchZoneView?.layoutParams = edgeTouchZoneView?.layoutParams?.apply {
+            width = (handleWidthPx + dpToPx(16)).coerceAtLeast(dpToPx(24))
+            height = (handleHeightPx + dpToPx(28)).coerceAtLeast(dpToPx(56))
+        }
+
+        edgeHandleView?.requestLayout()
+        edgeTouchZoneView?.requestLayout()
+        edgeTouchZoneView?.let { applyGestureExclusion(it) }
     }
 
     private fun togglePanel(panelContainer: View) {
@@ -356,9 +436,78 @@ class OverlayService : Service() {
 
     private fun applyPanelTheme(panelContainer: View) {
         when (store.getPanelTheme()) {
-            "light" -> panelContainer.setBackgroundResource(R.drawable.sidebar_bg)
-            "blue" -> panelContainer.setBackgroundResource(R.drawable.sidebar_bg_blue)
-            else -> panelContainer.setBackgroundResource(R.drawable.sidebar_bg_dark)
+            "light" -> {
+                panelContainer.setBackgroundResource(R.drawable.sidebar_bg)
+                applyFooterColors(
+                    mutedColor = ContextCompat.getColor(this, R.color.edge_panel_muted),
+                    labelColor = ContextCompat.getColor(this, R.color.edge_panel_label)
+                )
+                applyHandleTheme(
+                    backgroundColor = ContextCompat.getColor(this, R.color.edge_handle_bg),
+                    strokeColor = ContextCompat.getColor(this, R.color.edge_handle_stroke)
+                )
+            }
+            "blue" -> {
+                panelContainer.setBackgroundResource(R.drawable.sidebar_bg_blue)
+                applyFooterColors(
+                    mutedColor = Color.parseColor("#CCFFFFFF"),
+                    labelColor = Color.WHITE
+                )
+                applyHandleTheme(
+                    backgroundColor = Color.parseColor("#D94A617E"),
+                    strokeColor = Color.parseColor("#66FFFFFF")
+                )
+            }
+            "custom" -> {
+                val colors = PanelStylePalette.forCustomBase(store.getCustomPanelColor())
+                panelContainer.background = createRoundedBackground(
+                    color = colors.panelBackground,
+                    strokeColor = colors.panelStroke,
+                    cornerRadiusDp = 30f
+                )
+                applyFooterColors(colors.mutedColor, colors.labelColor)
+                applyHandleTheme(colors.handleBackground, colors.handleStroke)
+            }
+            else -> {
+                panelContainer.setBackgroundResource(R.drawable.sidebar_bg_dark)
+                applyFooterColors(
+                    mutedColor = Color.parseColor("#CCFFFFFF"),
+                    labelColor = Color.WHITE
+                )
+                applyHandleTheme(
+                    backgroundColor = Color.parseColor("#88929E"),
+                    strokeColor = Color.parseColor("#4DFFFFFF")
+                )
+            }
+        }
+    }
+
+    private fun applyFooterColors(mutedColor: Int, labelColor: Int) {
+        val root = sidebarView ?: return
+        root.findViewById<ImageButton>(R.id.btnAddApps)?.imageTintList = ColorStateList.valueOf(mutedColor)
+        root.findViewById<ImageButton>(R.id.btnEditApps)?.imageTintList = ColorStateList.valueOf(mutedColor)
+        root.findViewById<TextView>(R.id.panelFooterDots)?.setTextColor(mutedColor)
+
+        val adapter = sidebarAdapter
+        if (adapter != null) {
+            adapter.setLabelTextColor(labelColor)
+        }
+    }
+
+    private fun applyHandleTheme(backgroundColor: Int, strokeColor: Int) {
+        edgeHandleView?.background = createRoundedBackground(
+            color = backgroundColor,
+            strokeColor = strokeColor,
+            cornerRadiusDp = 10f
+        )
+    }
+
+    private fun createRoundedBackground(color: Int, strokeColor: Int, cornerRadiusDp: Float): GradientDrawable {
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dpToPx(cornerRadiusDp.toInt()).toFloat()
+            setColor(color)
+            setStroke(dpToPx(1), strokeColor)
         }
     }
 
@@ -369,6 +518,8 @@ class OverlayService : Service() {
         } catch (_: Exception) {
         }
         sidebarView = null
+        edgeTouchZoneView = null
+        edgeHandleView = null
         panelContainerView = null
         layoutParams = null
         isPanelVisible = false
@@ -413,13 +564,13 @@ class OverlayService : Service() {
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
         if (!store.isSidebarEnabled() || !Settings.canDrawOverlays(this)) return
-        val restartIntent = Intent(this, OverlayService::class.java).apply {
-            action = ACTION_START
-        }
-        ContextCompat.startForegroundService(this, restartIntent)
+        CrashRecovery.logEvent(this, name = "task_removed", reason = "service_task_removed")
+        start(this, ACTION_START)
     }
 
     override fun onDestroy() {
+        bindAppsJob?.cancel()
+        serviceScope.cancel()
         super.onDestroy()
         removeOverlay()
     }
@@ -427,6 +578,7 @@ class OverlayService : Service() {
     companion object {
         const val ACTION_START = "com.bretttech.sidebar.action.START"
         const val ACTION_RELOAD = "com.bretttech.sidebar.action.RELOAD"
+        const val ACTION_APPLY_PREFERENCES = "com.bretttech.sidebar.action.APPLY_PREFERENCES"
 
         private const val NOTIFICATION_CHANNEL_ID = "sidebar_overlay_channel"
 
@@ -434,7 +586,17 @@ class OverlayService : Service() {
             val intent = Intent(context, OverlayService::class.java).apply {
                 this.action = action
             }
-            ContextCompat.startForegroundService(context, intent)
+            try {
+                ContextCompat.startForegroundService(context, intent)
+            } catch (_: Exception) {
+                CrashRecovery.logEvent(
+                    context,
+                    name = "service_start_failed",
+                    reason = "startForegroundService_exception",
+                    extra = mapOf("action" to action)
+                )
+                CrashRecovery.scheduleServiceRestart(context, "start_foreground_service_failed")
+            }
         }
     }
 }

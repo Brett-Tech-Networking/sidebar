@@ -3,7 +3,6 @@ package com.bretttech.sidebar.ui.adapters
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.bretttech.sidebar.databinding.ItemAppBinding
 import com.bretttech.sidebar.model.AppEntry
@@ -18,7 +17,7 @@ class SidebarAdapter(
     private val items = mutableListOf<AppEntry>()
 
     private var editMode: Boolean = false
-    private var labelTextColorRes: Int = android.R.color.white
+    private var labelTextColor: Int = 0xFFFFFFFF.toInt()
 
     fun setEditMode(enabled: Boolean) {
         if (editMode == enabled) return
@@ -28,9 +27,9 @@ class SidebarAdapter(
 
     fun isEditMode(): Boolean = editMode
 
-    fun setLabelTextColorRes(colorRes: Int) {
-        if (labelTextColorRes == colorRes) return
-        labelTextColorRes = colorRes
+    fun setLabelTextColor(color: Int) {
+        if (labelTextColor == color) return
+        labelTextColor = color
         notifyDataSetChanged()
     }
 
@@ -73,9 +72,7 @@ class SidebarAdapter(
         val item = items[position]
         holder.binding.appIcon.setImageDrawable(item.icon)
         holder.binding.appLabel.text = item.label
-        holder.binding.appLabel.setTextColor(
-            ContextCompat.getColor(holder.binding.root.context, labelTextColorRes)
-        )
+        holder.binding.appLabel.setTextColor(labelTextColor)
         holder.binding.btnRemove.visibility = if (editMode) View.VISIBLE else View.GONE
         holder.binding.btnRemove.setOnClickListener { onRemove(item) }
         holder.binding.root.setOnClickListener {

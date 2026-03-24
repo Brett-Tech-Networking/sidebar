@@ -13,6 +13,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.bretttech.sidebar.databinding.ActivityMainBinding
 import com.bretttech.sidebar.service.OverlayService
+import com.bretttech.sidebar.ui.theme.settings.PreferencesActivity
 import com.bretttech.sidebar.ui.theme.settings.SettingsActivity
 
 class MainActivity : AppCompatActivity() {
@@ -48,6 +49,10 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnOpenSettings.setOnClickListener {
             startActivity(SettingsActivity.intent(this))
+        }
+
+        binding.btnPreferences.setOnClickListener {
+            startActivity(PreferencesActivity.intent(this))
         }
 
         binding.btnStartSidebar.setOnClickListener {
