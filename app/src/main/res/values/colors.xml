@@ -14,4 +14,16 @@
     <color name="edge_panel_item_bg">#FFFFFFFF</color>
     <color name="edge_panel_label">#FF1D232B</color>
     <color name="edge_panel_muted">#FF70757F</color>
+    <color name="home_bg">#FFF4F7FB</color>
+    <color name="home_card">#FFFFFFFF</color>
+    <color name="home_stroke">#140F172A</color>
+    <color name="home_hero">#FF16202C</color>
+    <color name="home_hero_secondary">#B7D1E6</color>
+    <color name="home_text_primary">#FF18212B</color>
+    <color name="home_text_secondary">#FF62707E</color>
+    <color name="home_chip_ok_bg">#1638B26B</color>
+    <color name="home_chip_ok_text">#FF196A43</color>
+    <color name="home_chip_warn_bg">#1AF97316</color>
+    <color name="home_chip_warn_text">#FF9A3412</color>
+    <color name="home_icon_button_bg">#1FFFFFFF</color>
 </resources>

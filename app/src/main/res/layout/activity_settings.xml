@@ -1,10 +1,61 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/rootSettings"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingBottom="8dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/shortcut_editor_title"
+                android:textColor="@color/home_text_primary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/shortcut_editor_subtitle"
+                android:textColor="@color/home_text_secondary"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnOpenPreferences"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:contentDescription="@string/open_preferences"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:padding="0dp"
+            app:backgroundTint="@color/home_bg"
+            app:cornerRadius="18dp"
+            app:icon="@drawable/ic_settings"
+            app:iconGravity="textStart"
+            app:iconPadding="0dp"
+            app:iconTint="@color/home_text_primary"
+            app:rippleColor="@color/home_chip_ok_bg"
+            app:strokeColor="@color/home_stroke"
+            app:strokeWidth="1dp" />
+    </LinearLayout>
 
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
@@ -33,13 +84,6 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:overScrollMode="ifContentScrolls" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnCrashLogs"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/view_crash_logs" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnSave"

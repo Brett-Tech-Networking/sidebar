@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.MenuItem
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -18,14 +17,11 @@ import com.bretttech.sidebar.databinding.ActivitySettingsBinding
 import com.bretttech.sidebar.model.AppEntry
 import com.bretttech.sidebar.service.OverlayService
 import com.bretttech.sidebar.ui.adapters.AppSelectAdapter
+import com.bretttech.sidebar.ui.theme.settings.PreferencesActivity
 import com.bretttech.sidebar.util.AppsLoader
-import com.bretttech.sidebar.util.CrashRecovery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.text.DateFormat
-import java.util.Date
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -55,7 +51,6 @@ class SettingsActivity : AppCompatActivity() {
         ViewCompat.requestApplyInsets(binding.root)
 
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.title = getString(R.string.manage_shortcuts)
 
         store = SelectedAppsStore(this)
 
@@ -92,44 +87,9 @@ class SettingsActivity : AppCompatActivity() {
             finish()
         }
 
-        binding.btnCrashLogs.setOnClickListener {
-            showCrashLogsDialog()
+        binding.btnOpenPreferences.setOnClickListener {
+            startActivity(PreferencesActivity.intent(this))
         }
-    }
-
-    private fun showCrashLogsDialog() {
-        val entries = CrashRecovery.getRecentEvents(this)
-        val message = if (entries.isEmpty()) {
-            getString(R.string.crash_logs_empty)
-        } else {
-            entries.joinToString(separator = "\n\n") { raw -> formatCrashEvent(raw) }
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.crash_logs_title))
-            .setMessage(message)
-            .setNegativeButton(getString(R.string.close), null)
-            .setPositiveButton(getString(R.string.clear_logs)) { _, _ ->
-                CrashRecovery.clearLogs(this)
-            }
-            .show()
-    }
-
-    private fun formatCrashEvent(raw: String): String {
-        val json = runCatching { JSONObject(raw) }.getOrNull() ?: return raw
-        val ts = json.optLong("ts", 0L)
-        val timeText = if (ts > 0L) DateFormat.getDateTimeInstance().format(Date(ts)) else "unknown time"
-        val name = json.optString("name", "event")
-        val reason = json.optString("reason", "")
-        val extra = json.optJSONObject("extra")
-        val extraText = if (extra == null || extra.length() == 0) {
-            ""
-        } else {
-            val keys = extra.keys().asSequence().toList()
-            keys.joinToString(separator = ", ", prefix = "\n") { key ->
-                "$key=${extra.optString(key, "")}" }
-        }
-        return "$timeText\n$name ($reason)$extraText"
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {

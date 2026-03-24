@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="home_bg">#FF0B1118</color>
+    <color name="home_card">#FF121B25</color>
+    <color name="home_stroke">#33C4D2E0</color>
+    <color name="home_hero">#FF1A2633</color>
+    <color name="home_hero_secondary">#C6D8EA</color>
+    <color name="home_text_primary">#FFEAF0F6</color>
+    <color name="home_text_secondary">#FF9AA8B8</color>
+    <color name="home_chip_ok_bg">#2138B26B</color>
+    <color name="home_chip_ok_text">#FF8AE7B8</color>
+    <color name="home_chip_warn_bg">#29F97316</color>
+    <color name="home_chip_warn_text">#FFFFB48A</color>
+    <color name="home_icon_button_bg">#26FFFFFF</color>
+</resources>

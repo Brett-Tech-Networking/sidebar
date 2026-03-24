@@ -1,15 +1,23 @@
 <resources>
     <string name="app_name">Edge Sidebar</string>
-    <string name="main_subtitle">Quick app panel for Pixel. Keep it enabled and open it from the screen edge at any time.</string>
+    <string name="main_subtitle">Keep your essential apps one swipe away with a clean, always-ready side rail.</string>
     <string name="status_overlay_granted">Overlay permission granted. Sidebar can stay available on top of other apps.</string>
     <string name="status_overlay_missing">Overlay permission is required before the edge panel can appear.</string>
     <string name="overlay_required">Overlay permission is required.</string>
-    <string name="grant_overlay_permission">Grant Overlay Permission</string>
-    <string name="manage_shortcuts">Manage Shortcuts</string>
+    <string name="grant_overlay_permission">Enable Overlay Access</string>
+    <string name="manage_shortcuts">Edit Shortcuts</string>
     <string name="preferences">Preferences</string>
-    <string name="start_sidebar">Start / Refresh Sidebar</string>
+    <string name="start_sidebar">Launch Sidebar</string>
     <string name="sidebar_settings">Sidebar Settings</string>
     <string name="sidebar_preferences">Sidebar Preferences</string>
+    <string name="quick_actions">Quick Actions</string>
+    <string name="action_overlay_desc">Required once so the sidebar can float over other apps.</string>
+    <string name="action_shortcuts_desc">Choose which apps appear in the side panel.</string>
+    <string name="action_launch_desc">Refresh the live overlay after changes or launch it now.</string>
+    <string name="open_preferences">Open preferences</string>
+    <string name="open_crash_logs">Open crash logs</string>
+    <string name="shortcut_editor_title">Edit your sidebar apps</string>
+    <string name="shortcut_editor_subtitle">Choose the apps that should appear in the side panel.</string>
     <string name="open_sidebar">Open sidebar</string>
     <string name="quick_apps">Quick Apps</string>
     <string name="close_sidebar">Close sidebar</string>
@@ -33,7 +41,7 @@
     <string name="notification_channel_name">Edge Sidebar Service</string>
     <string name="notification_title">Edge Sidebar is running</string>
     <string name="notification_body">Tap the edge handle to open quick apps.</string>
-    <string name="settings_hint">Add or remove app shortcuts. Changes apply immediately after saving.</string>
+    <string name="settings_hint">Changes apply after saving.</string>
     <string name="save">Save</string>
     <string name="view_crash_logs">View Crash Logs</string>
     <string name="crash_logs_title">Crash Recovery Log</string>
