@@ -53,9 +53,11 @@ class OverlayService : Service() {
     private lateinit var notificationManager: NotificationManager
     private lateinit var windowManager: WindowManager
     private var sidebarView: View? = null
+    private var handleOverlayView: View? = null
     private var dismissOverlayView: View? = null
     private lateinit var store: SelectedAppsStore
     private var layoutParams: WindowManager.LayoutParams? = null
+    private var panelLayoutParams: WindowManager.LayoutParams? = null
     private var isPanelVisible = false
     private var currentSide: String = "right"
     private val selectedPackages = mutableListOf<String>()
@@ -64,12 +66,14 @@ class OverlayService : Service() {
     private var panelContainerView: View? = null
     private var edgeTouchZoneView: View? = null
     private var edgeHandleView: View? = null
+    private var lastPanelWidthPx: Int = 0
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var bindAppsJob: Job? = null
 
     private val estimatedTileHeightDp = 88
     private val panelWidthSingleColumnDp = 132
     private val panelWidthTwoColumnDp = 220
+    private val panelGapDp = 7
 
     private val dragHoldMillis = 350L
 
@@ -91,11 +95,14 @@ class OverlayService : Service() {
 
         if (!store.isSidebarEnabled()) {
             removeOverlay()
+            stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
         }
 
         if (!Settings.canDrawOverlays(this)) {
+            removeOverlay()
+            stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
         }
@@ -103,7 +110,7 @@ class OverlayService : Service() {
         when (action) {
             ACTION_RELOAD -> reloadOverlay()
             ACTION_APPLY_PREFERENCES -> applyPreferencesToOverlay()
-            ACTION_START -> if (sidebarView == null) createOverlay() else bindSidebarData()
+            ACTION_START -> if (handleOverlayView == null || sidebarView == null) createOverlay() else bindSidebarData()
         }
 
         return START_STICKY
@@ -112,22 +119,22 @@ class OverlayService : Service() {
     private fun createOverlay() {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val inflater = LayoutInflater.from(this)
-        val view = inflater.inflate(R.layout.overlay_sidebar, null)
-        sidebarView = view
+        val handleView = inflater.inflate(R.layout.overlay_handle, null)
+        val panelView = inflater.inflate(R.layout.overlay_panel, null)
+        handleOverlayView = handleView
+        sidebarView = panelView
 
-        val overlayRow = view.findViewById<LinearLayout>(R.id.overlayRow)
-        val edgeTouchZone = view.findViewById<FrameLayout>(R.id.edgeTouchZone)
-        val edgeHandle = view.findViewById<View>(R.id.edgeHandle)
-        val panelContainer = view.findViewById<View>(R.id.panelContainer)
+        val edgeTouchZone = handleView.findViewById<FrameLayout>(R.id.edgeTouchZone)
+        val edgeHandle = handleView.findViewById<View>(R.id.edgeHandle)
+        val panelContainer = panelView.findViewById<View>(R.id.panelContainer)
         edgeTouchZoneView = edgeTouchZone
         edgeHandleView = edgeHandle
         panelContainerView = panelContainer
-        val sidebarRecycler = view.findViewById<RecyclerView>(R.id.sidebarRecycler)
-        val btnAddApps = view.findViewById<ImageButton>(R.id.btnAddApps)
-        val btnEditApps = view.findViewById<ImageButton>(R.id.btnEditApps)
+        val sidebarRecycler = panelView.findViewById<RecyclerView>(R.id.sidebarRecycler)
+        val btnAddApps = panelView.findViewById<ImageButton>(R.id.btnAddApps)
+        val btnEditApps = panelView.findViewById<ImageButton>(R.id.btnEditApps)
 
         currentSide = store.getSidebarSide()
-        overlayRow.layoutDirection = if (currentSide == "right") View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
         applyHandleSize()
         applyPanelTheme(panelContainer)
         panelContainer.visibility = View.GONE
@@ -203,8 +210,7 @@ class OverlayService : Service() {
             layoutFlag,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
             this.gravity = gravity or Gravity.CENTER_VERTICAL
@@ -213,7 +219,22 @@ class OverlayService : Service() {
         }
         layoutParams = params
 
-        windowManager.addView(view, params)
+        val panelParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            layoutFlag,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            this.gravity = gravity or Gravity.CENTER_VERTICAL
+            x = getPanelOffsetPx()
+            y = store.getSidebarYOffset()
+        }
+        panelLayoutParams = panelParams
+
+        windowManager.addView(handleView, params)
+        windowManager.addView(panelView, panelParams)
         applyGestureExclusion(edgeTouchZone)
 
         edgeTouchZone.setOnTouchListener(object : View.OnTouchListener {
@@ -256,7 +277,13 @@ class OverlayService : Service() {
 
                         params.x = initialX
                         params.y = initialY + deltaY
-                        windowManager.updateViewLayout(view, params)
+                        panelLayoutParams?.y = params.y
+                        windowManager.updateViewLayout(handleView, params)
+                        sidebarView?.let { panel ->
+                            panelLayoutParams?.let { panelParamsCurrent ->
+                                windowManager.updateViewLayout(panel, panelParamsCurrent)
+                            }
+                        }
                         return true
                     }
                     MotionEvent.ACTION_UP -> {
@@ -318,10 +345,12 @@ class OverlayService : Service() {
             val recyclerHeightPx = if (recycler.height > 0) recycler.height else dpToPx(440)
             val singleColumnCapacity = (recyclerHeightPx / estimatedTileHeightPx).coerceAtLeast(1)
             val useTwoColumns = ordered.size > singleColumnCapacity
+            val desiredPanelWidthPx = dpToPx(if (useTwoColumns) panelWidthTwoColumnDp else panelWidthSingleColumnDp)
+            lastPanelWidthPx = desiredPanelWidthPx
 
             sidebarLayoutManager?.spanCount = if (useTwoColumns) 2 else 1
             panelContainer?.layoutParams = panelContainer.layoutParams.apply {
-                width = dpToPx(if (useTwoColumns) panelWidthTwoColumnDp else panelWidthSingleColumnDp)
+                width = desiredPanelWidthPx
             }
             panelContainer?.requestLayout()
 
@@ -341,20 +370,24 @@ class OverlayService : Service() {
     }
 
     private fun applyPreferencesToOverlay() {
-        if (sidebarView == null) {
+        if (handleOverlayView == null || sidebarView == null) {
             createOverlay()
             return
         }
 
-        val root = sidebarView ?: return
-        val overlayRow = root.findViewById<LinearLayout>(R.id.overlayRow)
         currentSide = store.getSidebarSide()
-        overlayRow.layoutDirection = if (currentSide == "right") View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
 
         layoutParams?.let { params ->
             params.gravity = (if (currentSide == "right") Gravity.END else Gravity.START) or Gravity.CENTER_VERTICAL
             params.y = store.getSidebarYOffset()
-            windowManager.updateViewLayout(root, params)
+            handleOverlayView?.let { handle -> windowManager.updateViewLayout(handle, params) }
+        }
+
+        panelLayoutParams?.let { params ->
+            params.gravity = (if (currentSide == "right") Gravity.END else Gravity.START) or Gravity.CENTER_VERTICAL
+            params.y = store.getSidebarYOffset()
+            params.x = getPanelOffsetPx()
+            sidebarView?.let { panel -> windowManager.updateViewLayout(panel, params) }
         }
 
         panelContainerView?.let { panel ->
@@ -371,18 +404,30 @@ class OverlayService : Service() {
         val handleWidthPx = dpToPx(store.getHandleWidthDp())
         val handleHeightPx = dpToPx(store.getHandleHeightDp())
 
-        edgeHandleView?.layoutParams = edgeHandleView?.layoutParams?.apply {
+        edgeHandleView?.layoutParams?.apply {
             width = handleWidthPx
             height = handleHeightPx
+            edgeHandleView?.layoutParams = this
         }
-        edgeTouchZoneView?.layoutParams = edgeTouchZoneView?.layoutParams?.apply {
+        edgeTouchZoneView?.layoutParams?.apply {
             width = (handleWidthPx + dpToPx(16)).coerceAtLeast(dpToPx(24))
             height = (handleHeightPx + dpToPx(28)).coerceAtLeast(dpToPx(56))
+            edgeTouchZoneView?.layoutParams = this
         }
 
         edgeHandleView?.requestLayout()
         edgeTouchZoneView?.requestLayout()
         edgeTouchZoneView?.let { applyGestureExclusion(it) }
+        panelLayoutParams?.let { params ->
+            params.x = getPanelOffsetPx()
+            sidebarView?.let { panel -> windowManager.updateViewLayout(panel, params) }
+        }
+    }
+
+    private fun getPanelOffsetPx(): Int {
+        val handleWidthPx = dpToPx(store.getHandleWidthDp())
+        val touchZoneWidthPx = (handleWidthPx + dpToPx(16)).coerceAtLeast(dpToPx(24))
+        return touchZoneWidthPx + dpToPx(panelGapDp)
     }
 
     private fun togglePanel(panelContainer: View) {
@@ -397,10 +442,8 @@ class OverlayService : Service() {
         val side = currentSide
         val fromX = if (side == "right") dpToPx(24).toFloat() else -dpToPx(24).toFloat()
         ensureDismissOverlay(panelContainer)
-        bringSidebarToFront()
+        bringPanelToFront()
         panelContainer.animate().cancel()
-        edgeTouchZoneView?.translationX = 0f
-        edgeTouchZoneView?.translationY = 0f
         panelContainer.visibility = View.VISIBLE
         panelContainer.translationX = fromX
         panelContainer.alpha = 0f
@@ -416,9 +459,6 @@ class OverlayService : Service() {
     private fun hidePanel(panelContainer: View) {
         if (!isPanelVisible && panelContainer.visibility != View.VISIBLE) return
         panelContainer.animate().cancel()
-        val handleLocationBeforeClose = edgeTouchZoneView?.let { currentView ->
-            IntArray(2).also { currentView.getLocationOnScreen(it) }
-        }
         sidebarAdapter?.setEditMode(false)
         panelContainer.animate()
             .alpha(0f)
@@ -427,22 +467,10 @@ class OverlayService : Service() {
                 panelContainer.visibility = View.GONE
                 panelContainer.translationX = 0f
                 panelContainer.alpha = 1f
-                stabilizeHandleAfterClose(handleLocationBeforeClose)
                 removeDismissOverlay()
             }
             .start()
         isPanelVisible = false
-    }
-
-    private fun stabilizeHandleAfterClose(locationBeforeClose: IntArray?) {
-        val edgeView = edgeTouchZoneView ?: return
-        val originalLocation = locationBeforeClose ?: return
-        edgeView.post {
-            val currentLocation = IntArray(2)
-            edgeView.getLocationOnScreen(currentLocation)
-            edgeView.translationX = (originalLocation[0] - currentLocation[0]).toFloat()
-            edgeView.translationY = (originalLocation[1] - currentLocation[1]).toFloat()
-        }
     }
 
     private fun ensureDismissOverlay(panelContainer: View) {
@@ -482,9 +510,9 @@ class OverlayService : Service() {
         }
     }
 
-    private fun bringSidebarToFront() {
+    private fun bringPanelToFront() {
         val root = sidebarView ?: return
-        val params = layoutParams ?: return
+        val params = panelLayoutParams ?: return
         try {
             windowManager.removeView(root)
             windowManager.addView(root, params)
@@ -580,17 +608,26 @@ class OverlayService : Service() {
 
     private fun removeOverlay() {
         removeDismissOverlay()
+        val handle = handleOverlayView
+        if (handle != null) {
+            try {
+                windowManager.removeView(handle)
+            } catch (_: Exception) {
+            }
+        }
         val current = sidebarView ?: return
         try {
             windowManager.removeView(current)
         } catch (_: Exception) {
         }
         sidebarView = null
+        handleOverlayView = null
         dismissOverlayView = null
         edgeTouchZoneView = null
         edgeHandleView = null
         panelContainerView = null
         layoutParams = null
+        panelLayoutParams = null
         isPanelVisible = false
     }
 
@@ -632,9 +669,7 @@ class OverlayService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        if (!store.isSidebarEnabled() || !Settings.canDrawOverlays(this)) return
         CrashRecovery.logEvent(this, name = "task_removed", reason = "service_task_removed")
-        start(this, ACTION_START)
     }
 
     override fun onDestroy() {
@@ -656,7 +691,11 @@ class OverlayService : Service() {
                 this.action = action
             }
             try {
-                ContextCompat.startForegroundService(context, intent)
+                if (action == ACTION_START) {
+                    ContextCompat.startForegroundService(context, intent)
+                } else {
+                    context.startService(intent)
+                }
             } catch (_: Exception) {
                 CrashRecovery.logEvent(
                     context,
