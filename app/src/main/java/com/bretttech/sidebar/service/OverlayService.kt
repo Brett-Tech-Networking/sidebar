@@ -71,6 +71,7 @@ class OverlayService : Service() {
     private var bindAppsJob: Job? = null
 
     private val estimatedTileHeightDp = 88
+    private val maxSingleColumnApps = 7
     private val panelWidthSingleColumnDp = 132
     private val panelWidthTwoColumnDp = 220
     private val panelGapDp = 7
@@ -341,16 +342,14 @@ class OverlayService : Service() {
 
             if (!isActive || sidebarView == null) return@launch
 
-            val estimatedTileHeightPx = dpToPx(estimatedTileHeightDp)
-            val recyclerHeightPx = if (recycler.height > 0) recycler.height else dpToPx(440)
-            val singleColumnCapacity = (recyclerHeightPx / estimatedTileHeightPx).coerceAtLeast(1)
-            val useTwoColumns = ordered.size > singleColumnCapacity
+            val useTwoColumns = ordered.size > maxSingleColumnApps
             val desiredPanelWidthPx = dpToPx(if (useTwoColumns) panelWidthTwoColumnDp else panelWidthSingleColumnDp)
             lastPanelWidthPx = desiredPanelWidthPx
 
             sidebarLayoutManager?.spanCount = if (useTwoColumns) 2 else 1
-            panelContainer?.layoutParams = panelContainer.layoutParams.apply {
-                width = desiredPanelWidthPx
+            panelContainer?.layoutParams?.let { lp ->
+                lp.width = desiredPanelWidthPx
+                panelContainer?.layoutParams = lp
             }
             panelContainer?.requestLayout()
 

@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/panelContainer"
     android:layout_width="220dp"
-    android:layout_height="520dp"
+    android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@drawable/sidebar_bg"
     android:paddingStart="10dp"
