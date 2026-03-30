@@ -101,7 +101,7 @@ object CrashRecovery {
         prefs.edit()
             .putLong(KEY_LAST_WINDOW_START_MS, nextWindowStart)
             .putInt(KEY_WINDOW_COUNT, nextCount)
-            .apply()
+            .commit()
 
         val allowed = nextCount <= MAX_RESTARTS_PER_WINDOW
         if (!allowed) {
@@ -151,7 +151,9 @@ object CrashRecovery {
             arr
         }
 
-        prefs.edit().putString(KEY_EVENT_LOG, trimmed.toString()).apply()
+        // Use commit() (synchronous) so the write is guaranteed to reach disk
+        // before the process is killed by an uncaught exception handler.
+        prefs.edit().putString(KEY_EVENT_LOG, trimmed.toString()).commit()
     }
 
     fun getRecentEvents(context: Context): List<String> {

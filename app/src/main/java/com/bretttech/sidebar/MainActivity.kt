@@ -6,6 +6,7 @@ import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,8 +27,25 @@ import java.util.Date
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private var awaitingBatterySettingsResult = false
 
     private val requestPostNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    private val requestBatteryOptimization =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            if (!awaitingBatterySettingsResult) return@registerForActivityResult
+            awaitingBatterySettingsResult = false
+
+            val pm = getSystemService(POWER_SERVICE) as PowerManager
+            if (pm.isIgnoringBatteryOptimizations(packageName)) {
+                CrashRecovery.logEvent(this, name = "battery_settings_result", reason = "granted")
+                return@registerForActivityResult
+            }
+
+            // If user denied OR OEM settings page failed/crashed, open app details as a
+            // reliable fallback location for Battery > Allow background usage.
+            openAppDetailsBatteryFallback("result_not_ignored")
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,6 +82,10 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnCrashLogs.setOnClickListener {
             showCrashLogsDialog()
+        }
+
+        binding.btnBatteryOptimization.setOnClickListener {
+            requestBatteryOptimizationExemption()
         }
 
         binding.btnStartSidebar.setOnClickListener {
@@ -111,6 +133,23 @@ class MainActivity : AppCompatActivity() {
         if (hasOverlayPermission) {
             OverlayService.start(this, OverlayService.ACTION_START)
         }
+
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        val isIgnoring = pm.isIgnoringBatteryOptimizations(packageName)
+        val batteryStepColor = ContextCompat.getColor(
+            this,
+            if (isIgnoring) R.color.home_chip_ok_text else R.color.home_chip_warn_text
+        )
+        binding.tvBatteryStep.setTextColor(batteryStepColor)
+        binding.tvBatteryStep.backgroundTintList = ColorStateList.valueOf(
+            ContextCompat.getColor(
+                this,
+                if (isIgnoring) R.color.home_chip_ok_bg else R.color.home_chip_warn_bg
+            )
+        )
+        binding.tvBatteryDesc.text = getString(
+            if (isIgnoring) R.string.battery_status_ok else R.string.battery_status_warn
+        )
     }
 
     private fun showCrashLogsDialog() {
@@ -155,5 +194,86 @@ class MainActivity : AppCompatActivity() {
         val uri = Uri.parse("package:$packageName")
         val permIntent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, uri)
         startActivity(permIntent)
+    }
+
+    private fun requestBatteryOptimizationExemption() {
+        val intents = listOf(
+            Intent("android.settings.APP_BATTERY_SETTINGS").apply {
+                data = Uri.parse("package:$packageName")
+                putExtra("package_name", packageName)
+                putExtra("app_package", packageName)
+                putExtra("android.provider.extra.APP_PACKAGE", packageName)
+            },
+            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:$packageName")
+            }
+        )
+
+        for ((index, intent) in intents.withIndex()) {
+            val launched = runCatching {
+                awaitingBatterySettingsResult = true
+                requestBatteryOptimization.launch(intent)
+                CrashRecovery.logEvent(
+                    this,
+                    name = "battery_settings_opened",
+                    reason = "intent_$index",
+                    extra = mapOf("action" to (intent.action ?: ""))
+                )
+                true
+            }.getOrElse { error ->
+                awaitingBatterySettingsResult = false
+                CrashRecovery.logEvent(
+                    this,
+                    name = "battery_settings_launch_failed",
+                    reason = "intent_$index",
+                    extra = mapOf(
+                        "action" to (intent.action ?: ""),
+                        "error" to (error.message ?: error.javaClass.simpleName)
+                    )
+                )
+                false
+            }
+
+            if (launched) return
+        }
+
+        openAppDetailsBatteryFallback("all_intents_failed")
+    }
+
+    private fun openAppDetailsBatteryFallback(reason: String) {
+        val fallbackIntents = listOf(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$packageName")
+            },
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+        )
+
+        for ((index, intent) in fallbackIntents.withIndex()) {
+            val launched = runCatching {
+                startActivity(intent)
+                CrashRecovery.logEvent(
+                    this,
+                    name = "battery_settings_fallback_opened",
+                    reason = "${reason}_$index",
+                    extra = mapOf("action" to (intent.action ?: ""))
+                )
+                true
+            }.getOrElse { error ->
+                CrashRecovery.logEvent(
+                    this,
+                    name = "battery_settings_fallback_failed",
+                    reason = "${reason}_$index",
+                    extra = mapOf(
+                        "action" to (intent.action ?: ""),
+                        "error" to (error.message ?: error.javaClass.simpleName)
+                    )
+                )
+                false
+            }
+
+            if (launched) return
+        }
+
+        Toast.makeText(this, R.string.battery_settings_open_failed, Toast.LENGTH_LONG).show()
     }
 }

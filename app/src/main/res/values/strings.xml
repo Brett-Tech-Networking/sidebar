@@ -53,4 +53,9 @@
     <string name="side_left">Left side</string>
     <string name="side_right">Right side</string>
     <string name="app_icon">App icon</string>
+    <string name="disable_battery_optimization">Disable Battery Optimization</string>
+    <string name="action_battery_desc">Allows the sidebar to keep running 24/7 without being killed by the system.</string>
+    <string name="battery_status_ok">Battery optimization is off — sidebar can run uninterrupted.</string>
+    <string name="battery_status_warn">Battery optimization may kill the sidebar. Tap to disable it.</string>
+    <string name="battery_settings_open_failed">Could not open battery settings on this device.</string>
 </resources>

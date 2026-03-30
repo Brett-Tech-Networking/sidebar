@@ -52,7 +52,18 @@ object AppsLoader {
         val launchIntent: Intent? = pm.getLaunchIntentForPackage(packageName)
         if (launchIntent != null) {
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(launchIntent)
+            try {
+                context.startActivity(launchIntent)
+            } catch (e: Exception) {
+                // App may have been uninstalled or disabled since the sidebar last loaded.
+                // Log via CrashRecovery so it shows in the diagnostic log.
+                com.bretttech.sidebar.util.CrashRecovery.logEvent(
+                    context,
+                    name = "launch_failed",
+                    reason = e.javaClass.simpleName,
+                    extra = mapOf("package" to packageName, "message" to (e.message ?: ""))
+                )
+            }
         }
     }
 }

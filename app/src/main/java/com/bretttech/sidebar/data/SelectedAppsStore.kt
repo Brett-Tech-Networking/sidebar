@@ -9,7 +9,7 @@ class SelectedAppsStore(context: Context) {
 
     fun getSelectedPackages(): List<String> {
         val json = prefs.getString(KEY_PACKAGES, "[]") ?: "[]"
-        val arr = JSONArray(json)
+        val arr = runCatching { JSONArray(json) }.getOrElse { JSONArray() }
         val out = mutableListOf<String>()
         for (i in 0 until arr.length()) out.add(arr.optString(i))
         return out

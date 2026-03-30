@@ -39,6 +39,7 @@ import com.bretttech.sidebar.ui.theme.settings.SettingsActivity
 import com.bretttech.sidebar.util.AppsLoader
 import com.bretttech.sidebar.util.CrashRecovery
 import com.bretttech.sidebar.util.PanelStylePalette
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -67,7 +68,20 @@ class OverlayService : Service() {
     private var edgeTouchZoneView: View? = null
     private var edgeHandleView: View? = null
     private var lastPanelWidthPx: Int = 0
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val serviceScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main.immediate +
+            CoroutineExceptionHandler { _, throwable ->
+                CrashRecovery.logEvent(
+                    this,
+                    name = "coroutine_exception",
+                    reason = throwable.javaClass.simpleName,
+                    extra = mapOf(
+                        "message" to (throwable.message ?: ""),
+                        "cause" to (throwable.cause?.javaClass?.simpleName ?: "")
+                    )
+                )
+            }
+    )
     private var bindAppsJob: Job? = null
 
     private val estimatedTileHeightDp = 88
@@ -379,14 +393,28 @@ class OverlayService : Service() {
         layoutParams?.let { params ->
             params.gravity = (if (currentSide == "right") Gravity.END else Gravity.START) or Gravity.CENTER_VERTICAL
             params.y = store.getSidebarYOffset()
-            handleOverlayView?.let { handle -> windowManager.updateViewLayout(handle, params) }
+            handleOverlayView?.let { handle ->
+                try {
+                    windowManager.updateViewLayout(handle, params)
+                } catch (e: Exception) {
+                    CrashRecovery.logEvent(this, name = "wm_error", reason = "applyPrefs_handle",
+                        extra = mapOf("error" to (e.message ?: e.javaClass.simpleName)))
+                }
+            }
         }
 
         panelLayoutParams?.let { params ->
             params.gravity = (if (currentSide == "right") Gravity.END else Gravity.START) or Gravity.CENTER_VERTICAL
             params.y = store.getSidebarYOffset()
             params.x = getPanelOffsetPx()
-            sidebarView?.let { panel -> windowManager.updateViewLayout(panel, params) }
+            sidebarView?.let { panel ->
+                try {
+                    windowManager.updateViewLayout(panel, params)
+                } catch (e: Exception) {
+                    CrashRecovery.logEvent(this, name = "wm_error", reason = "applyPrefs_panel",
+                        extra = mapOf("error" to (e.message ?: e.javaClass.simpleName)))
+                }
+            }
         }
 
         panelContainerView?.let { panel ->
@@ -419,7 +447,14 @@ class OverlayService : Service() {
         edgeTouchZoneView?.let { applyGestureExclusion(it) }
         panelLayoutParams?.let { params ->
             params.x = getPanelOffsetPx()
-            sidebarView?.let { panel -> windowManager.updateViewLayout(panel, params) }
+            sidebarView?.let { panel ->
+                try {
+                    windowManager.updateViewLayout(panel, params)
+                } catch (e: Exception) {
+                    CrashRecovery.logEvent(this, name = "wm_error", reason = "applyHandleSize_panel",
+                        extra = mapOf("error" to (e.message ?: e.javaClass.simpleName)))
+                }
+            }
         }
     }
 
@@ -505,7 +540,9 @@ class OverlayService : Service() {
         try {
             windowManager.addView(overlay, params)
             dismissOverlayView = overlay
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            CrashRecovery.logEvent(this, name = "wm_error", reason = "ensureDismissOverlay",
+                extra = mapOf("error" to (e.message ?: e.javaClass.simpleName)))
         }
     }
 
@@ -515,7 +552,9 @@ class OverlayService : Service() {
         try {
             windowManager.removeView(root)
             windowManager.addView(root, params)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            CrashRecovery.logEvent(this, name = "wm_error", reason = "bringPanelToFront",
+                extra = mapOf("error" to (e.message ?: e.javaClass.simpleName)))
         }
     }
 
@@ -523,7 +562,9 @@ class OverlayService : Service() {
         val overlay = dismissOverlayView ?: return
         try {
             windowManager.removeView(overlay)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            CrashRecovery.logEvent(this, name = "wm_error", reason = "removeDismissOverlay",
+                extra = mapOf("error" to (e.message ?: e.javaClass.simpleName)))
         }
         dismissOverlayView = null
     }
@@ -611,14 +652,21 @@ class OverlayService : Service() {
         if (handle != null) {
             try {
                 windowManager.removeView(handle)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                CrashRecovery.logEvent(this, name = "wm_error", reason = "removeOverlay_handle",
+                    extra = mapOf("error" to (e.message ?: e.javaClass.simpleName)))
             }
         }
-        val current = sidebarView ?: return
-        try {
-            windowManager.removeView(current)
-        } catch (_: Exception) {
+        val current = sidebarView
+        if (current != null) {
+            try {
+                windowManager.removeView(current)
+            } catch (e: Exception) {
+                CrashRecovery.logEvent(this, name = "wm_error", reason = "removeOverlay_panel",
+                    extra = mapOf("error" to (e.message ?: e.javaClass.simpleName)))
+            }
         }
+        // Always clear all tracked state, regardless of which views were attached.
         sidebarView = null
         handleOverlayView = null
         dismissOverlayView = null
@@ -669,6 +717,10 @@ class OverlayService : Service() {
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
         CrashRecovery.logEvent(this, name = "task_removed", reason = "service_task_removed")
+        // START_STICKY alone is not reliable on many OEMs (Samsung, Xiaomi, etc.).
+        // Proactively schedule a restart via AlarmManager so the service comes back
+        // even if the system decides not to restart it after task removal.
+        CrashRecovery.scheduleServiceRestart(this, "task_removed")
     }
 
     override fun onDestroy() {
@@ -693,7 +745,9 @@ class OverlayService : Service() {
                 if (action == ACTION_START) {
                     ContextCompat.startForegroundService(context, intent)
                 } else {
-                    context.startService(intent)
+                    // Use startForegroundService for all actions: plain startService
+                    // throws IllegalStateException on API 26+ when called from background.
+                    ContextCompat.startForegroundService(context, intent)
                 }
             } catch (_: Exception) {
                 CrashRecovery.logEvent(
